@@ -1,0 +1,6 @@
+site_id,patient_id,image_id,laterality,view,age,cancer,biopsy,invasive,BIRADS,implant,density,machine_id,difficult_negative_case
+1,10097,664674273,L,MLO,44.0,0,0,0,1.0,0,C,49,False
+1,10097,929754876,L,CC,44.0,0,0,0,1.0,0,C,49,False
+1,10097,1957744616,L,CC,44.0,0,0,0,1.0,0,C,49,False
+1,10097,166011602,R,MLO,44.0,0,0,0,1.0,0,C,49,False
+1,10097,268368896,R,CC,44.0,0,0,0,1.0,0,C,49,False

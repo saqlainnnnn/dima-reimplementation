@@ -1,1 +1,35 @@
-.venv
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Virtual environment
+.venv/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# VS Code
+.vscode/
+
+# macOS
+.DS_Store
+
+# Dataset
+data/raw/
+
+# Processed data
+data/processed/
+
+# Model weights
+weights/
+*.pth
+*.pt
+*.ckpt
+
+# Logs
+logs/
+wandb/
+
+# Temporary files
+*.zip
