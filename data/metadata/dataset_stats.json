@@ -1,0 +1,17 @@
+{
+    "patients": 11913,
+    "rows": 54706,
+    "density_patients": 5809,
+    "density_rows": 29470,
+    "positive_patients": 486,
+    "density_distribution": {
+        "B": 12651,
+        "C": 12175,
+        "A": 3105,
+        "D": 1539
+    },
+    "cancer_distribution": {
+        "0": 53548,
+        "1": 1158
+    }
+}

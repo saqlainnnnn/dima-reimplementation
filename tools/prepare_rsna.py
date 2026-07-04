@@ -1,22 +1,10 @@
 #!/usr/bin/env python3
-"""
-Prepare the RSNA Breast Cancer Detection metadata.
-
-This script:
-1. Loads the original train.csv
-2. Removes patients without all four mammography views
-3. Saves:
-    - train_all.csv
-    - train_density.csv
-4. Prints dataset statistics
-"""
 
 from pathlib import Path
 import argparse
 import json
 
 import pandas as pd
-
 
 REQUIRED_COLUMNS = [
     "patient_id",
@@ -26,13 +14,6 @@ REQUIRED_COLUMNS = [
     "cancer",
     "density",
 ]
-
-REQUIRED_VIEWS = {
-    "LCC",
-    "LMLO",
-    "RCC",
-    "RMLO",
-}
 
 
 class RSNAPreparer:
@@ -45,46 +26,82 @@ class RSNAPreparer:
 
         self.df = None
 
-    ##############################################################
+    ##########################################################
 
     def load(self):
 
-        print(f"Loading metadata from {self.csv_path}")
+        print(f"Loading {self.csv_path}")
 
         self.df = pd.read_csv(self.csv_path)
 
-    ##############################################################
+        print(f"Rows: {len(self.df):,}")
+        print(f"Patients: {self.df.patient_id.nunique():,}")
+
+    ##########################################################
 
     def validate(self):
 
         missing = set(REQUIRED_COLUMNS) - set(self.df.columns)
 
         if missing:
-            raise ValueError(
-                f"Missing required columns: {missing}"
-            )
+            raise ValueError(f"Missing columns: {missing}")
 
-    ##############################################################
+    ##########################################################
+
+    def remove_duplicates(self):
+
+        before = len(self.df)
+
+        self.df = self.df.drop_duplicates(
+            subset=["patient_id", "image_id"]
+        )
+
+        after = len(self.df)
+
+        print(f"Removed {before-after} duplicate rows")
+
+    ##########################################################
 
     def filter_complete_patients(self):
 
+        REQUIRED = {
+            ("L", "CC"),
+            ("L", "MLO"),
+            ("R", "CC"),
+            ("R", "MLO"),
+        }
+
         patient_views = (
             self.df
-            .groupby("patient_id")["view"]
-            .apply(set)
+            .groupby("patient_id")
+            .apply(
+                lambda x: set(
+                    zip(
+                        x["laterality"],
+                        x["view"]
+                    )
+                ),
+                include_groups=False
+            )
         )
 
         complete_patients = patient_views[
             patient_views.apply(
-                lambda x: REQUIRED_VIEWS.issubset(x)
+                lambda x: REQUIRED.issubset(x)
             )
         ].index
 
+        print(
+            f"Patients with all four views: {len(complete_patients):,}"
+        )
+
         self.df = self.df[
-            self.df.patient_id.isin(complete_patients)
+            self.df.patient_id.isin(
+                complete_patients
+            )
         ].copy()
 
-    ##############################################################
+    ##########################################################
 
     def save(self):
 
@@ -94,48 +111,57 @@ class RSNAPreparer:
             self.df["density"].notna()
         ].copy()
 
-        train_all_path = (
-            self.output_dir / "train_all.csv"
+        density_per_patient = (
+            train_density
+            .groupby("patient_id")["density"]
+            .nunique()
         )
 
-        train_density_path = (
-            self.output_dir / "train_density.csv"
+        assert (density_per_patient == 1).all(), (
+            "Some patients have multiple density labels!"
         )
 
         train_all.to_csv(
-            train_all_path,
+            self.output_dir / "train_all.csv",
             index=False
         )
 
         train_density.to_csv(
-            train_density_path,
+            self.output_dir / "train_density.csv",
             index=False
         )
 
         stats = {
 
-            "patients": int(
-                train_all.patient_id.nunique()
-            ),
+            "patients":
+                int(train_all.patient_id.nunique()),
 
-            "rows": int(
-                len(train_all)
-            ),
+            "rows":
+                int(len(train_all)),
 
-            "density_patients": int(
-                train_density.patient_id.nunique()
-            ),
+            "density_patients":
+                int(train_density.patient_id.nunique()),
 
-            "density_rows": int(
-                len(train_density)
-            ),
+            "density_rows":
+                int(len(train_density)),
 
-            "positive_patients": int(
-                train_all
-                .groupby("patient_id")["cancer"]
-                .max()
-                .sum()
-            )
+            "positive_patients":
+                int(
+                    train_all
+                    .groupby("patient_id")["cancer"]
+                    .max()
+                    .sum()
+                ),
+
+            "density_distribution":
+                train_density["density"]
+                .value_counts(dropna=False)
+                .to_dict(),
+
+            "cancer_distribution":
+                train_all["cancer"]
+                .value_counts()
+                .to_dict(),
         }
 
         with open(
@@ -153,38 +179,35 @@ class RSNAPreparer:
         print("RSNA DATASET SUMMARY")
         print("==============================")
 
-        print(f"Rows                 : {len(train_all)}")
-        print(f"Patients             : {train_all.patient_id.nunique()}")
-        print(f"Cancer Positive      : {stats['positive_patients']}")
-        print(f"Rows w/ Density      : {len(train_density)}")
-        print(f"Patients w/ Density  : {train_density.patient_id.nunique()}")
+        print(f"Rows                 : {stats['rows']:,}")
+        print(f"Patients             : {stats['patients']:,}")
+        print(f"Positive Patients    : {stats['positive_patients']:,}")
+        print(f"Rows with Density    : {stats['density_rows']:,}")
+        print(f"Patients with Density: {stats['density_patients']:,}")
 
         print("\nDensity Distribution")
 
-        print(
-            train_density["density"]
-            .value_counts(dropna=False)
-        )
+        print(train_density["density"].value_counts(dropna=False))
 
         print("\nCancer Distribution")
 
-        print(
-            train_all["cancer"]
-            .value_counts()
-        )
+        print(train_all["cancer"].value_counts())
 
         print("\nSaved")
 
-        print(train_all_path)
-        print(train_density_path)
+        print(self.output_dir / "train_all.csv")
+        print(self.output_dir / "train_density.csv")
+        print(self.output_dir / "dataset_stats.json")
 
-    ##############################################################
+    ##########################################################
 
     def run(self):
 
         self.load()
 
         self.validate()
+
+        self.remove_duplicates()
 
         self.filter_complete_patients()
 
@@ -200,21 +223,19 @@ def main():
 
     parser.add_argument(
         "--csv",
-        required=True,
-        help="Path to RSNA train.csv"
+        required=True
     )
 
     parser.add_argument(
         "--output",
-        default="data/metadata",
-        help="Output directory"
+        default="data/metadata"
     )
 
     args = parser.parse_args()
 
     RSNAPreparer(
-        args.csv,
-        args.output
+        csv_path=args.csv,
+        output_dir=args.output
     ).run()
 
 
